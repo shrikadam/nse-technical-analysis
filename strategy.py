@@ -3,6 +3,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+from tvDatafeed import TvDatafeed, Interval
+
+tv = TvDatafeed()
+
 def plot_strategy(df):
     fig, ax = plt.subplots(
         2, 1, sharex=True, figsize=(10, 8), gridspec_kw={"height_ratios": [6, 3]}
@@ -53,8 +57,8 @@ def prepare_strategy(df):
     df["Signal"] = df["MACD"].ewm(span=signal_window, adjust=False).mean()
 
     # Find crossover points
-    df["Bullish_Crossover"] = (df["MACD"] > df["Signal"]) & (df["MACD"].shift(1) < df["Signal"].shift(1)) & (df["MACD"] < 10)  # Bullish
-    df["Bearish_Crossover"] = (df["MACD"] < df["Signal"]) & (df["MACD"].shift(1) > df["Signal"].shift(1)) & (df["MACD"] > 0)  # Bearish
+    df["Bullish_Crossover"] = (df["MACD"] > df["Signal"]) & (df["MACD"].shift(1) < df["Signal"].shift(1))# & (df["MACD"] < 0)  # Bullish
+    df["Bearish_Crossover"] = (df["MACD"] < df["Signal"]) & (df["MACD"].shift(1) > df["Signal"].shift(1))# & (df["MACD"] > 0)  # Bearish
 
     return df
 
@@ -111,38 +115,45 @@ def plot_index_performance(categories, values):
     return fig
 
 # sensex_df = pd.read_csv("data/BSE_Bankex_01011999_31122024.csv", index_col="Date", parse_dates=True)    
-    
 # sensex_df = sensex_df.loc["2024-07-01":"2024-12-31"]
-
 # sensex_df = prepare_strategy(sensex_df)
 # total_invested, total_earned, profit_loss = backtest_strategy(sensex_df)
 
-folder_path = 'data'
+# folder_path = 'data'
+# # Dictionary to store plotted lines and their corresponding data
+# categories = []
+# values = []
+# # Loop through all CSV files in the folder
+# for filename in os.listdir(folder_path):
+#     if filename.endswith('.csv'):
+#         # Extract the name between the first and second underscores
+#         legend_name = filename.split('_')[1]
+#         categories.append(legend_name)
+#         # Load the CSV file into a pandas DataFrame
+#         file_path = os.path.join(folder_path, filename)
+#         df = pd.read_csv(file_path, index_col="Date", parse_dates=True) 
+#         sd = "2024-01-01"
+#         ed = "2024-12-31"
+#         df = df.loc[sd:ed]  
+#         macd_df = prepare_strategy(df)
+#         fig = plot_strategy(macd_df)
+#         fig.savefig(f"plots/{legend_name}.png")
+#         print(f"Index name: {legend_name}")
+#         invested, cash, pl = backtest_strategy(macd_df)
+#         values.append(pl)
 
-# Dictionary to store plotted lines and their corresponding data
-categories = []
-values = []
+# fig = plot_index_performance(categories, values)
+# fig.savefig(f"plots/performance.png")
+# total_pl = sum(values)
+# print(f"Total Profit/Loss: ₹{total_pl:.2f} ({'Profit' if total_pl > 0 else 'Loss'})")
 
-# Loop through all CSV files in the folder
-for filename in os.listdir(folder_path):
-    if filename.endswith('.csv'):
-        # Extract the name between the first and second underscores
-        legend_name = filename.split('_')[1]
-        categories.append(legend_name)
-        # Load the CSV file into a pandas DataFrame
-        file_path = os.path.join(folder_path, filename)
-        df = pd.read_csv(file_path, index_col="Date", parse_dates=True) 
-        sd = "2024-04-01"
-        ed = "2024-12-31"
-        df = df.loc[sd:ed]  
-        macd_df = prepare_strategy(df)
-        fig = plot_strategy(macd_df)
-        fig.savefig(f"plots/{legend_name}.png")
-        print(f"Index name: {legend_name}")
-        invested, cash, pl = backtest_strategy(macd_df)
-        values.append(pl)
-
-fig = plot_index_performance(categories, values)
-fig.savefig(f"plots/performance.png")
-total_pl = sum(values)
-print(f"Total Profit/Loss: ₹{total_pl:.2f} ({'Profit' if total_pl > 0 else 'Loss'})")
+mazdock_df = tv.get_hist(symbol='MAZDOCK',exchange='NSE',interval=Interval.in_daily,n_bars=1000)
+mazdock_df.rename(columns={'close': 'Close'}, inplace=True)
+sd = "2024-01-01"
+ed = "2024-12-31"
+mazdock_df = mazdock_df.loc[sd:ed] 
+mazdock_df = prepare_strategy(mazdock_df)
+fig = plot_strategy(mazdock_df)
+fig.savefig(f"plots/MAZDOCK.png")
+total_invested, total_earned, profit_loss = backtest_strategy(mazdock_df)
+print(f"Total Profit/Loss: ₹{profit_loss:.2f} ({'Profit' if profit_loss > 0 else 'Loss'})")
