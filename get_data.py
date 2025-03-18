@@ -5,7 +5,7 @@ from tvDatafeed import TvDatafeed, Interval
 
 tv = TvDatafeed()
 
-nifty50_df = pd.read_csv("data/ind_nifty50list.csv")    
+nifty50_df = pd.read_csv("data/nifty50list.csv")    
 # Create an empty dictionary to store the industry-wise stocks
 industry_dict = {}
 
@@ -52,8 +52,10 @@ for industry, symbols in industry_dict.items():
     plt.grid()
 
     # Save the figure with the industry name
-    plt.savefig(f"plots/{industry}_historical_data.png")
+    plt.savefig(f"plots/industrywise_normed/{industry}.png")
     plt.close()  # Close the plot to avoid overlap in next iteration
 
 nifty50_stocks_df = pd.concat(nifty50_stocks, axis=1)
-nifty50_stocks_df.to_csv('nifty50_histdata.csv', index=True)
+nifty50_stocks_df.index = nifty50_stocks_df.index.date
+nifty50_stocks_df.index.name = 'Date'  # Rename index to 'Date'
+nifty50_stocks_df.to_csv('data/nifty50_histdata.csv', index=True)
