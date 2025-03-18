@@ -34,6 +34,7 @@ def fetch_and_plot_data(industry_dict):
             # Fetch historical data for each stock
             try:
                 df = tv.get_hist(symbol=symbol, exchange='NSE', interval=Interval.in_daily, n_bars=500)
+                # Normalize
                 df['close'] /= df['close'].iloc[0]
                 # Plot the close prices for each stock
                 plt.plot(df.index, df['close'], label=symbol)
@@ -45,13 +46,16 @@ def fetch_and_plot_data(industry_dict):
         plt.xlabel("Date")
         plt.ylabel("Close Price")
         plt.legend(title="Stocks", loc="upper left")
-        
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
+        plt.grid()
+
         # Save the figure with the industry name
-        plt.savefig(f"plots/nifty50/{industry}_historical_data.png")
+        plt.savefig(f"plots/{industry}_historical_data.png")
         plt.close()  # Close the plot to avoid overlap in next iteration
 
 fetch_and_plot_data(industry_dict)
-# stock_data = tv.get_hist(symbol='BAJAJ-AUTO',exchange='NSE',interval=Interval.in_daily,n_bars=500)
+
+# stock_data = tv.get_hist(symbol='BAJAJ_AUTO',exchange='NSE',interval=Interval.in_daily,n_bars=500)
 # print(stock_data.columns)
 # stock_data["close"].plot()
 # plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
