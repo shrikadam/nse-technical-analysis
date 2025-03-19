@@ -4,53 +4,66 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-def prepare_classic_macd_strategy(df):
+def bollinger_bands(df, column="Close", window=20, n_std=2):
+    sma = df[column].rolling(window=window).mean()
+    std = df[column].rolling(window=window).std()
+    upper_band = sma + (n_std * std)
+    lower_band = sma - (n_std * std)
+    bb_vec = (df[column] - sma) / (n_std * std)
+    return upper_band, lower_band, bb_vec
+
+def macd(df, column='Close', short_window=12, long_window=26, signal_window=9):
+    short_ema = df[column].ewm(span=short_window, adjust=False).mean()
+    long_ema = df[column].ewm(span=long_window, adjust=False).mean()
+    macd = short_ema - long_ema
+    signal = macd.ewm(span=signal_window, adjust=False).mean()   
+    return macd, signal
+
+def prepare_indicators(df):
     df = df.copy()
-    short_window = 12
-    long_window = 26
-    signal_window = 9
-
-    df["MACD"] = df["Close"].ewm(span=short_window, adjust=False).mean() - df["Close"].ewm(span=long_window, adjust=False).mean()
-    df["Signal"] = df["MACD"].ewm(span=signal_window, adjust=False).mean()
-
+    df["MACD"], df["Signal"] = macd(df)
     df['MACD_Slope'] = np.degrees(np.arctan(df['MACD'].diff()))
     df['Signal_Slope'] = np.degrees(np.arctan(df['Signal'].diff()))
-    
-    # Find crossover points
-    df["Bullish_Crossover"] = (df["MACD"] > df["Signal"]) & (df["MACD"].shift(1) < df["Signal"].shift(1)) & (df["MACD"] < 0)  # Bullish
-    df["Bearish_Crossover"] = (df["MACD"] < df["Signal"]) & (df["MACD"].shift(1) > df["Signal"].shift(1)) & (df["MACD"] > 0)  # Bearish
-
+    df["Upper_BB"], df["Lower_BB"], df["BB_Vec"] = bollinger_bands(df)
     return df
 
-def prepare_advanced_macd_strategy(df):
+def apply_classic_macd_strategy(df):
     df = df.copy()
-    short_window = 12
-    long_window = 26
-    signal_window = 9
+    # Find crossover points
+    df["BUY"] = ((df["MACD"] > df["Signal"]) & 
+                               (df["MACD"].shift(1) < df["Signal"].shift(1)) & 
+                               (df["MACD"] < 0))  # Bullish
+    df["SELL"] = ((df["MACD"] < df["Signal"]) & 
+                               (df["MACD"].shift(1) > df["Signal"].shift(1)) & 
+                               (df["MACD"] > 0))  # Bearish
+    return df
 
-    df["MACD"] = df["Close"].ewm(span=short_window, adjust=False).mean() - df["Close"].ewm(span=long_window, adjust=False).mean()
-    df["Signal"] = df["MACD"].ewm(span=signal_window, adjust=False).mean()
-
-    df['MACD_Slope'] = np.degrees(np.arctan(df['MACD'].diff()))
-    df['Signal_Slope'] = np.degrees(np.arctan(df['Signal'].diff()))
-    
+def apply_advanced_macd_strategy(df):
+    df = df.copy()
     # Identify bullish crossovers (MACD crosses above Signal with slope > 45°)
-    df['Bullish_Crossover'] = ((df['MACD'] > df['Signal']) & 
+    df['BUY'] = ((df['MACD'] > df['Signal']) & 
                                (df['MACD'].shift(1) < df['Signal'].shift(1)) &
                                ((df["MACD"] < 0) | (df['MACD_Slope'] > 45)))
-
     # Identify bearish crossovers (MACD crosses below Signal)
-    df['Bearish_Crossover'] = ((df['MACD'] < df['Signal']) & 
+    df['SELL'] = ((df['MACD'] < df['Signal']) & 
                                (df['MACD'].shift(1) > df['Signal'].shift(1)) &
                                (df["MACD"] > 0))
 
     return df
 
+def appply_classic_bb_strategy(df):
+    df = df.copy()
+    df['BUY'] = (df['BB_Vec'] < -0.9) & (df['BB_Vec'].shift(1) > -0.7)
+    df['SELL'] = (df['BB_Vec'] > 0.9)# & (df['BB_Vec'].shift(1) < 0.7)
+    return df
+
 def plot_strategy(df):
     fig, ax = plt.subplots(
-        2, 1, sharex=True, figsize=(10, 8), gridspec_kw={"height_ratios": [6, 3]}
+        3, 1, sharex=True, figsize=(10, 8), gridspec_kw={"height_ratios": [8, 3, 3]}
     )
     plt.title("Stock Price (Above) vs 12-26-9 MACD (Below)")
+    ax[0].plot(df["Upper_BB"], color="violet", linewidth=0.8, label="UpperBB")
+    ax[0].plot(df["Lower_BB"], color="violet", linewidth=0.8, label="LowerBB")
     ax[0].plot(df["Close"], color="teal", label="Index")
     ax[0].set_ylabel("Stock Price")
     ax[0].set_xlabel("Date")
@@ -65,41 +78,30 @@ def plot_strategy(df):
     ax[1].grid()
     ax[1].legend()
 
+    ax[2].plot(df["BB_Vec"], color="orange", linewidth=0.8, label="BB_Vec")
+    ax[2].axhline(-1, linestyle="--", color="g")
+    ax[2].axhline(1, linestyle="--", color="r")
+    ax[2].set_ylabel("BB_Vec")
+    ax[2].set_xlabel("Date")
+    ax[2].grid()
+    ax[2].legend()
+
     # Get dates where crossover happens
-    bullish_dates = df.index[df["Bullish_Crossover"]]
-    bearish_dates = df.index[df["Bearish_Crossover"]]
+    bullish_dates = df.index[df["BUY"]]
+    bearish_dates = df.index[df["SELL"]]
 
     for date in bullish_dates:
         ax[0].axvline(x=date, color="g", linestyle="--", linewidth=0.8, alpha=0.7)
         ax[1].axvline(x=date, color="g", linestyle="--", linewidth=0.8, alpha=0.7)
+        ax[2].axvline(x=date, color="g", linestyle="--", linewidth=0.8, alpha=0.7)
 
     for date in bearish_dates:
         ax[0].axvline(x=date, color="r", linestyle="--", linewidth=0.8, alpha=0.7)
         ax[1].axvline(x=date, color="r", linestyle="--", linewidth=0.8, alpha=0.7)
+        ax[2].axvline(x=date, color="r", linestyle="--", linewidth=0.8, alpha=0.7)
 
     plt.gcf().autofmt_xdate()
 
-    return fig
-
-def stack_figures_side_by_side(fig1, fig2):
-    # Create a new figure with two subplots side by side
-    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-
-    # Draw fig1 on the first subplot
-    for ax in fig1.get_axes():
-        ax.figure = fig
-        fig.axes.append(ax)
-        fig.add_axes(ax)
-        ax.change_geometry(1, 2, 1)
-
-    # Draw fig2 on the second subplot
-    for ax in fig2.get_axes():
-        ax.figure = fig
-        fig.axes.append(ax)
-        fig.add_axes(ax)
-        ax.change_geometry(1, 2, 2)
-
-    plt.tight_layout()
     return fig
 
 def backtest_strategy(df, initial_investment=1000):
@@ -109,13 +111,13 @@ def backtest_strategy(df, initial_investment=1000):
     last_buy_price = None  # Store the last buy price
     
     for i in range(len(df)):
-        if df["Bullish_Crossover"].iloc[i]:  # Buy Signal
+        if df["BUY"].iloc[i]:  # Buy Signal
             last_buy_price = df["Close"].iloc[i]
             invested += initial_investment / last_buy_price  # Convert money to shares
             total_invested += initial_investment  # Track total invested amount
             # print(f"BUY at {df.index[i].date()} | Price: {last_buy_price:.2f} | Shares: {invested:.4f} | Total Invested: ₹{total_invested}")
 
-        elif df["Bearish_Crossover"].iloc[i] and last_buy_price is not None:  # Sell Signal
+        elif df["SELL"].iloc[i] and last_buy_price is not None:  # Sell Signal
             sell_price = df["Close"].iloc[i]
             cash += invested * sell_price  # Convert shares to cash
             # print(f"SELL at {df.index[i].date()} | Price: {sell_price:.2f} | Cash: ₹{cash:.2f}")
@@ -139,15 +141,16 @@ def backtest_strategy(df, initial_investment=1000):
 
 if __name__ == "__main__":  
     ############ Single-stock Testing ############
-    # symbol = "BAJAJ_AUTO"
     df = pd.read_csv("data/nifty50_histdata.csv", index_col="Date", parse_dates=True)
+    # symbol = "WIPRO"
     symbol = random.choice(df.columns)
     df = df[symbol]
     print(symbol)
     df = df.to_frame(name='Close')
-    df_cl = prepare_classic_macd_strategy(df)
-    df_adv = prepare_advanced_macd_strategy(df)
-    sd = "2024-11-30"
+    df = prepare_indicators(df)
+    df_cl = apply_classic_macd_strategy(df)
+    df_adv = appply_classic_bb_strategy(df)
+    sd = "2024-09-01"
     ed = "2025-02-28"
     df_cl = df_cl.loc[sd:ed]
     df_adv = df_adv.loc[sd:ed]
@@ -157,7 +160,6 @@ if __name__ == "__main__":
     total_invested_adv, total_earned_adv, profit_loss_adv = backtest_strategy(df_adv)
     print(f"Classic Profit/Loss: ₹{profit_loss_cl:.2f} ({'Profit' if profit_loss_cl > 0 else 'Loss'})")
     print(f"Advanced Profit/Loss: ₹{profit_loss_adv:.2f} ({'Profit' if profit_loss_adv > 0 else 'Loss'})")
-    print(f"{'Classic won!!!' if profit_loss_cl >= profit_loss_adv else 'Advanced won!!!'}")
     # fig_cl.savefig(f"plots/{symbol}_classic.png")
     # fig_adv.savefig(f"plots/{symbol}_advanced.png")
     # fig = stack_figures_side_by_side(fig_cl, fig_adv)
