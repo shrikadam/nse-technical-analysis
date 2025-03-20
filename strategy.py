@@ -53,8 +53,10 @@ def apply_advanced_macd_strategy(df):
 
 def appply_classic_bb_strategy(df):
     df = df.copy()
-    df['BUY'] = (df['BB_Vec'] < -0.9) & (df['BB_Vec'].shift(1) > -0.7)
-    df['SELL'] = (df['BB_Vec'] > 0.9)# & (df['BB_Vec'].shift(1) < 0.7)
+    llim = -0.9
+    ulim = 0.9
+    df['BUY'] = (df['BB_Vec'].shift(1) < llim) & (df['BB_Vec'] >= llim)
+    df['SELL'] = (df['BB_Vec'].shift(1) > ulim) & (df['BB_Vec'] <= ulim)
     return df
 
 def plot_strategy(df):
@@ -142,24 +144,29 @@ def backtest_strategy(df, initial_investment=1000):
 if __name__ == "__main__":  
     ############ Single-stock Testing ############
     df = pd.read_csv("data/nifty50_histdata.csv", index_col="Date", parse_dates=True)
-    # symbol = "WIPRO"
+    # symbol = "INFY"
     symbol = random.choice(df.columns)
     df = df[symbol]
     print(symbol)
     df = df.to_frame(name='Close')
     df = prepare_indicators(df)
-    df_cl = apply_classic_macd_strategy(df)
-    df_adv = appply_classic_bb_strategy(df)
-    sd = "2024-09-01"
-    ed = "2025-02-28"
-    df_cl = df_cl.loc[sd:ed]
-    df_adv = df_adv.loc[sd:ed]
-    fig_cl = plot_strategy(df_cl)
-    fig_adv = plot_strategy(df_adv)
-    total_invested_cl, total_earned_cl, profit_loss_cl = backtest_strategy(df_cl)
-    total_invested_adv, total_earned_adv, profit_loss_adv = backtest_strategy(df_adv)
-    print(f"Classic Profit/Loss: ₹{profit_loss_cl:.2f} ({'Profit' if profit_loss_cl > 0 else 'Loss'})")
-    print(f"Advanced Profit/Loss: ₹{profit_loss_adv:.2f} ({'Profit' if profit_loss_adv > 0 else 'Loss'})")
+    df_macd = apply_classic_macd_strategy(df)
+    df_bb = appply_classic_bb_strategy(df)
+    sd = "2023-09-01"
+    ed = "2024-02-28"
+    df_macd = df_macd.loc[sd:ed]
+    df_bb = df_bb.loc[sd:ed]
+    fig_macd = plot_strategy(df_macd)
+    fig_bb = plot_strategy(df_bb)
+    total_invested_macd, total_earned_macd, profit_loss_macd = backtest_strategy(df_macd)
+    total_invested_bb, total_earned_bb, profit_loss_bb = backtest_strategy(df_bb)
+    print("MACD Strategy:") 
+    print(f"Total Invested: ₹{total_invested_macd:.2f}")
+    print(f"Profit/Loss: ₹{profit_loss_macd:.2f} ({abs(profit_loss_macd/total_invested_macd)*100:.2f}{'% Profit' if profit_loss_macd > 0 else '% Loss'})")
+    print("---")
+    print("BB Strategy:") 
+    print(f"Total Invested: ₹{total_invested_bb:.2f}")
+    print(f"Profit/Loss: ₹{profit_loss_bb:.2f} ({abs(profit_loss_bb/total_invested_bb)*100:.2f}{'% Profit' if profit_loss_bb > 0 else '% Loss'})")
     # fig_cl.savefig(f"plots/{symbol}_classic.png")
     # fig_adv.savefig(f"plots/{symbol}_advanced.png")
     # fig = stack_figures_side_by_side(fig_cl, fig_adv)
