@@ -53,10 +53,19 @@ def apply_advanced_macd_strategy(df):
 
 def appply_classic_bb_strategy(df):
     df = df.copy()
-    llim = -0.9
-    ulim = 0.9
+    llim = -1
+    ulim = 1
     df['BUY'] = (df['BB_Vec'].shift(1) < llim) & (df['BB_Vec'] >= llim)
     df['SELL'] = (df['BB_Vec'].shift(1) > ulim) & (df['BB_Vec'] <= ulim)
+    return df
+
+def apply_my_strategy(df):
+    df = df.copy()
+    llim = -0.8
+    df['BUY'] = (df['BB_Vec'].shift(1) < llim) & (df['BB_Vec'] >= llim)
+    df['SELL'] = ((df['MACD'] < df['Signal']) & 
+                               (df['MACD'].shift(1) > df['Signal'].shift(1)) &
+                               (df["MACD"] > 0))
     return df
 
 def plot_strategy(df):
@@ -142,9 +151,9 @@ def backtest_strategy(df, initial_investment=1000):
     return total_invested, cash, profit_or_loss  # Return key metrics
 
 if __name__ == "__main__":  
-    ############ Single-stock Testing ############
     df = pd.read_csv("data/nifty50_histdata.csv", index_col="Date", parse_dates=True)
-    # symbol = "INFY"
+    ############ Single-stock Testing ############
+    symbol = "SBIN"
     symbol = random.choice(df.columns)
     df = df[symbol]
     print(symbol)
@@ -152,14 +161,18 @@ if __name__ == "__main__":
     df = prepare_indicators(df)
     df_macd = apply_classic_macd_strategy(df)
     df_bb = appply_classic_bb_strategy(df)
-    sd = "2023-09-01"
-    ed = "2024-02-28"
+    df_shri = apply_my_strategy(df)
+    sd = "2024-08-01"
+    ed = "2025-02-28"
     df_macd = df_macd.loc[sd:ed]
     df_bb = df_bb.loc[sd:ed]
+    df_shri = df_shri.loc[sd:ed]
     fig_macd = plot_strategy(df_macd)
     fig_bb = plot_strategy(df_bb)
+    fig_shri = plot_strategy(df_shri)
     total_invested_macd, total_earned_macd, profit_loss_macd = backtest_strategy(df_macd)
     total_invested_bb, total_earned_bb, profit_loss_bb = backtest_strategy(df_bb)
+    total_invested_shri, total_earned_shri, profit_loss_shri = backtest_strategy(df_shri)
     print("MACD Strategy:") 
     print(f"Total Invested: ₹{total_invested_macd:.2f}")
     print(f"Profit/Loss: ₹{profit_loss_macd:.2f} ({abs(profit_loss_macd/total_invested_macd)*100:.2f}{'% Profit' if profit_loss_macd > 0 else '% Loss'})")
@@ -167,29 +180,41 @@ if __name__ == "__main__":
     print("BB Strategy:") 
     print(f"Total Invested: ₹{total_invested_bb:.2f}")
     print(f"Profit/Loss: ₹{profit_loss_bb:.2f} ({abs(profit_loss_bb/total_invested_bb)*100:.2f}{'% Profit' if profit_loss_bb > 0 else '% Loss'})")
+    print("---")
+    print("My Strategy:") 
+    print(f"Total Invested: ₹{total_invested_shri:.2f}")
+    print(f"Profit/Loss: ₹{profit_loss_shri:.2f} ({abs(profit_loss_shri/total_invested_shri)*100:.2f}{'% Profit' if profit_loss_shri > 0 else '% Loss'})")
     # fig_cl.savefig(f"plots/{symbol}_classic.png")
     # fig_adv.savefig(f"plots/{symbol}_advanced.png")
     # fig = stack_figures_side_by_side(fig_cl, fig_adv)
     plt.show()
     
     ############ Nifty50 Testing ############
-    # df = pd.read_csv("data/nifty50_histdata.csv", index_col="Date", parse_dates=True)
+    # grand_pl_macd = 0
+    # grand_pl_bb = 0
+    # grand_pl_shri = 0
     # for i in range(20):
-    #     df_result = pd.DataFrame(columns=['Symbol', 'PL_Classic', 'PL_Advanced'])
+    #     df_result = pd.DataFrame(columns=['Symbol', 'PL_MACD', 'PL_BB', 'PL_Shri'])
     #     random_syms = random.sample(list(df.columns), 10)
     #     # for i, symbol in enumerate(df.columns):
     #     for i, symbol in enumerate(random_syms):
     #         df_symbol = df[symbol]
     #         df_symbol = df_symbol.to_frame(name='Close')
-    #         df_classic = prepare_classic_macd_strategy(df_symbol)
-    #         df_advanced = prepare_advanced_macd_strategy(df_symbol)
-    #         sd = "2025-01-31"
+    #         df_symbol = prepare_indicators(df_symbol)
+    #         df_macd = apply_classic_macd_strategy(df_symbol)
+    #         df_bb = appply_classic_bb_strategy(df_symbol)
+    #         df_shri = apply_my_strategy(df_symbol)
+    #         sd = "2024-08-01"
     #         ed = "2025-02-28"
-    #         df_classic = df_classic.loc[sd:ed]
-    #         df_advanced = df_advanced.loc[sd:ed]
-    #         total_invested_cl, total_earned_cl, profit_loss_cl = backtest_strategy(df_classic)
-    #         total_invested_adv, total_earned_adv, profit_loss_adv = backtest_strategy(df_advanced)
-    #         df_result.loc[i] = [symbol, profit_loss_cl, profit_loss_adv]
+    #         df_macd = df_macd.loc[sd:ed]
+    #         df_bb = df_bb.loc[sd:ed]
+    #         df_shri = df_shri.loc[sd:ed]
+    #         # fig_macd = plot_strategy(df_macd)
+    #         # fig_bb = plot_strategy(df_bb)
+    #         total_invested_macd, total_earned_macd, profit_loss_macd = backtest_strategy(df_macd)
+    #         total_invested_bb, total_earned_bb, profit_loss_bb = backtest_strategy(df_bb)
+    #         total_invested_shri, total_earned_shri, profit_loss_shri = backtest_strategy(df_shri)
+    #         df_result.loc[i] = [symbol, profit_loss_macd, profit_loss_bb, profit_loss_shri]
     #         # print(symbol, profit_loss_cl, profit_loss_adv)
 
     #     # x = np.arange(len(df_result['Symbol']))
@@ -208,11 +233,20 @@ if __name__ == "__main__":
     #     # plt.tight_layout()
     #     # plt.show()
 
-    #     pl_classic = df_result["PL_Classic"].sum()
-    #     pl_advanced = df_result["PL_Advanced"].sum()
-    #     print("Classic PL: ", pl_classic)
-    #     print("Advanced PL: ", pl_advanced)
-    #     print(f"({'Classic won!!!' if pl_classic > pl_advanced else 'Advanced won!!!'})")
-    #     print("---")
+    #     pl_macd = df_result["PL_MACD"].sum()
+    #     pl_bb = df_result["PL_BB"].sum()
+    #     pl_shri = df_result["PL_Shri"].sum()
+    #     # print("MACD PL: ", pl_macd)
+    #     # print("BB PL: ", pl_bb)
+    #     # print("Shri PL: ", pl_shri)
+    #     # print("---")
+    #     grand_pl_macd += pl_macd
+    #     grand_pl_bb += pl_bb
+    #     grand_pl_shri += pl_shri
 
+    # print("Grand MACD PL: ", int(grand_pl_macd))
+    # print("Grand BB PL: ", int(grand_pl_bb))
+    # print("Grand Shri PL: ", int(grand_pl_shri))
+    
     plt.close()
+
