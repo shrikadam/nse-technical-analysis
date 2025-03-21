@@ -62,10 +62,12 @@ def appply_classic_bb_strategy(df):
 def apply_my_strategy(df):
     df = df.copy()
     llim = -0.8
+    ulim = 0.8
     df['BUY'] = (df['BB_Vec'].shift(1) < llim) & (df['BB_Vec'] >= llim)
-    df['SELL'] = ((df['MACD'] < df['Signal']) & 
-                               (df['MACD'].shift(1) > df['Signal'].shift(1)) &
-                               (df["MACD"] > 0))
+    df['SELL'] = (df['BB_Vec'].shift(1) > ulim) & (df['BB_Vec'] <= ulim)
+    # df['SELL'] = ((df['MACD'] < df['Signal']) & 
+    #                            (df['MACD'].shift(1) > df['Signal'].shift(1)) &
+    #                            (df["MACD"] > 0))
     return df
 
 def plot_strategy(df):
@@ -162,8 +164,8 @@ if __name__ == "__main__":
     df_macd = apply_classic_macd_strategy(df)
     df_bb = appply_classic_bb_strategy(df)
     df_shri = apply_my_strategy(df)
-    sd = "2024-08-01"
-    ed = "2025-02-28"
+    sd = "2024-09-01"
+    ed = "2025-03-20"
     df_macd = df_macd.loc[sd:ed]
     df_bb = df_bb.loc[sd:ed]
     df_shri = df_shri.loc[sd:ed]
@@ -249,4 +251,3 @@ if __name__ == "__main__":
     # print("Grand Shri PL: ", int(grand_pl_shri))
     
     plt.close()
-
