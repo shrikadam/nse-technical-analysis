@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import random
 
 def bollinger_bands(df, column="Close", window=20, n_std=2):
@@ -19,12 +20,22 @@ def macd(df, column='Close', short_window=12, long_window=26, signal_window=9):
     signal = macd.ewm(span=signal_window, adjust=False).mean()   
     return macd, signal
 
+def rsi(df, column="Close", window=14):
+    delta = df[column].diff()
+    delta = delta[1:]
+    up, down = delta.clip(lower=0), delta.clip(upper=0).abs()
+    roll_up, roll_down = up.ewm(alpha=1 / window).mean(), down.ewm(alpha=1 / window).mean()
+    rs = roll_up / roll_down
+    rsi = 100.0 - (100.0 / (1.0 + rs))
+    return rsi
+
 def prepare_indicators(df):
     df = df.copy()
     df["MACD"], df["Signal"] = macd(df)
     df['MACD_Slope'] = np.degrees(np.arctan(df['MACD'].diff()))
     df['Signal_Slope'] = np.degrees(np.arctan(df['Signal'].diff()))
     df["Upper_BB"], df["Lower_BB"], df["BB_Vec"] = bollinger_bands(df)
+    df['RSI'] = rsi(df)  
     return df
 
 def apply_classic_macd_strategy(df):
@@ -64,15 +75,36 @@ def apply_my_strategy(df):
     llim = -0.8
     ulim = 0.8
     df['BUY'] = (df['BB_Vec'].shift(1) < llim) & (df['BB_Vec'] >= llim)
-    df['SELL'] = (df['BB_Vec'].shift(1) > ulim) & (df['BB_Vec'] <= ulim)
-    # df['SELL'] = ((df['MACD'] < df['Signal']) & 
-    #                            (df['MACD'].shift(1) > df['Signal'].shift(1)) &
-    #                            (df["MACD"] > 0))
+    # df['SELL'] = (df['BB_Vec'].shift(1) > ulim) & (df['BB_Vec'] <= ulim)
+    df['SELL'] = ((df['MACD'] < df['Signal']) & 
+                               (df['MACD'].shift(1) > df['Signal'].shift(1)) &
+                               (df["MACD"] > 0))
+    # # Create potential signals based on BB_Vec crossovers
+    # potential_buy = (df['BB_Vec'].shift(1) < llim) & (df['BB_Vec'] >= llim)
+    # potential_sell = (df['BB_Vec'].shift(1) > ulim) & (df['BB_Vec'] <= ulim)
+    
+    # # Initialize actual BUY/SELL columns with False
+    # df['BUY'] = False
+    # df['SELL'] = False
+    
+    # # Track our position state
+    # in_position = False
+    
+    # # Iterate through the dataframe
+    # for i in range(len(df)):
+    #     if not in_position and potential_buy.iloc[i]:
+    #         # If we're not in a position and we have a potential buy signal
+    #         df.loc[df.index[i], 'BUY'] = True
+    #         in_position = True
+    #     elif in_position and potential_sell.iloc[i]:
+    #         # If we're in a position and we have a potential sell signal
+    #         df.loc[df.index[i], 'SELL'] = True
+    #         in_position = False
     return df
 
 def plot_strategy(df):
     fig, ax = plt.subplots(
-        3, 1, sharex=True, figsize=(10, 8), gridspec_kw={"height_ratios": [8, 3, 3]}
+        4, 1, sharex=True, figsize=(8, 10), gridspec_kw={"height_ratios": [8, 3, 3, 3]}
     )
     plt.title("Stock Price (Above) vs 12-26-9 MACD (Below)")
     ax[0].plot(df["Upper_BB"], color="violet", linewidth=0.8, label="UpperBB")
@@ -99,6 +131,15 @@ def plot_strategy(df):
     ax[2].grid()
     ax[2].legend()
 
+    ax[3].plot(df["RSI"], color="orange", linewidth=0.8, label="RSI")
+    ax[3].axhline(70, linestyle="--", color="r")
+    ax[3].axhline(50, linestyle="--", color="c")
+    ax[3].axhline(30, linestyle="--", color="g")
+    ax[3].set_ylabel("RSI")
+    ax[3].set_xlabel("Date")
+    ax[3].grid()
+    ax[3].legend()
+
     # Get dates where crossover happens
     bullish_dates = df.index[df["BUY"]]
     bearish_dates = df.index[df["SELL"]]
@@ -114,6 +155,8 @@ def plot_strategy(df):
         ax[2].axvline(x=date, color="r", linestyle="--", linewidth=0.8, alpha=0.7)
 
     plt.gcf().autofmt_xdate()
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
+    plt.tight_layout()
 
     return fig
 
@@ -155,8 +198,8 @@ def backtest_strategy(df, initial_investment=1000):
 if __name__ == "__main__":  
     df = pd.read_csv("data/nifty50_histdata.csv", index_col="Date", parse_dates=True)
     ############ Single-stock Testing ############
-    symbol = "SBIN"
-    symbol = random.choice(df.columns)
+    symbol = "APOLLOHOSP"
+    # symbol = random.choice(df.columns)
     df = df[symbol]
     print(symbol)
     df = df.to_frame(name='Close')
@@ -170,8 +213,8 @@ if __name__ == "__main__":
     df_bb = df_bb.loc[sd:ed]
     df_shri = df_shri.loc[sd:ed]
     fig_macd = plot_strategy(df_macd)
-    fig_bb = plot_strategy(df_bb)
-    fig_shri = plot_strategy(df_shri)
+    # fig_bb = plot_strategy(df_bb)
+    # fig_shri = plot_strategy(df_shri)
     total_invested_macd, total_earned_macd, profit_loss_macd = backtest_strategy(df_macd)
     total_invested_bb, total_earned_bb, profit_loss_bb = backtest_strategy(df_bb)
     total_invested_shri, total_earned_shri, profit_loss_shri = backtest_strategy(df_shri)
